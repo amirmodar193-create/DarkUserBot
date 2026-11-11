@@ -1,11 +1,25 @@
 import os
 import threading
 import subprocess
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 
 # ???? ??? ?? ????? ?? ???? ??? ???? ???????
 BOT_TOKEN = "9174255279:AAGccYt95PTy01rH8v140AgNIqcA6BJ2TZA"
+
+# ??? HTTP ??????? ??? ?-Render ?? ????? ????? Timeout ?? ??????
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    print(f"Dummy web server running on port {port}")
+    server.serve_forever()
 
 def run_maigret_in_thread(username: str, cmd: str, update: Update):
     try:
@@ -56,13 +70,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     thread.start()
 
 def main():
+    # ????? ??? ?-Web ?-Thread ???? ??? ????? ?? ????? ?-Render ????
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+
+    # ????? ?????? ??? ??????
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_username))
 
-    print("Bot is running...")
+    print("Telegram bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
