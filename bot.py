@@ -43,34 +43,18 @@ async def handle_username_input(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+def run_maigret_task(cmd, username, chat_id, application):
+    """??????? ??? ???? ??? ?? ????? ?? ????"""
+    import asyncio
     
-    chat_id = query.message.chat_id
-    username = user_search_data.get(chat_id)
-
-    if not username:
-        await query.edit_message_text("Oops, search data expired. Please send the username again.")
-        return
-
-    choice = query.data
-    if choice == "scan_normal":
-        await query.edit_message_text(f"Running normal scan for {username}...")
-        cmd = f"maigret {username} -H"
-    elif choice == "scan_full":
-        await query.edit_message_text(f"Running comprehensive scan for {username}...\nThis may take a few minutes, please wait.")
-        cmd = f"maigret {username} -H -a"
-    else:
-        return
-
     subprocess.run(cmd, shell=True)
-
     report_files = glob.glob(f"reports/*{username}*.html")
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     if report_files:
         latest_report = report_files[0]
-        
         summary_text = f"Scan completed successfully for: {username}\n\n"
         try:
             with open(latest_report, 'r', encoding='utf-8') as f:
@@ -88,16 +72,42 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             summary_text += "Results found, but could not parse the summary text automatically.\n"
 
-        await query.message.reply_text(summary_text)
+        loop.run_until_complete(application.bot.send_message(chat_id=chat_id, text=summary_text))
         
         with open(latest_report, 'rb') as f:
-            await query.message.reply_document(
+            loop.run_until_complete(application.bot.send_document(
+                chat_id=chat_id, 
                 document=f, 
                 filename=os.path.basename(latest_report),
                 caption="To download the report in HTML view, click here:"
-            )
+            ))
     else:
-        await query.message.reply_text(f"Scan finished, but no results or report were found for {username}.")
+        loop.run_until_complete(application.bot.send_message(chat_id=chat_id, text=f"Scan finished, but no results or report were found for {username}."))
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    chat_id = query.message.chat_id
+    username = user_search_data.get(chat_id)
+
+    if not username:
+        await query.edit_message_text("Oops, search data expired. Please send the username again.")
+        return
+
+    choice = query.data
+    if choice == "scan_normal":
+        await query.edit_message_text(f"Running normal scan for {username} (Running in background)...")
+        cmd = f"maigret {username} -H"
+    elif choice == "scan_full":
+        await query.edit_message_text(f"Running comprehensive scan for {username} (Running in background)...\nThis may take a few minutes.")
+        cmd = f"maigret {username} -H -a"
+    else:
+        return
+
+    # ????? ?????? ?-Thread ???? ??? ????? ????? ???? ???????
+    scan_thread = Thread(target=run_maigret_task, args=(cmd, username, chat_id, context.application))
+    scan_thread.start()
 
 if __name__ == '__main__':
     t = Thread(target=run_web, daemon=True)
