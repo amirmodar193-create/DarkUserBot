@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
 
 # ???? ??? ?? ????? ?? ???? ??? ???? ???????
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = "9174255279:AAGccYt95PTy01rH8v140AgNIqcA6BJ2TZA"
 
 def run_maigret_in_thread(username: str, cmd: str, update: Update):
     try:
